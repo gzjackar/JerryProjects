@@ -1,6 +1,7 @@
 // ===== STATE =====
 var state = { account: null, transactions: [], positions: {}, currentPrices: {} };
 var USD_TO_CNY = 7.2;  // 固定汇率：1美元=7.2人民币
+var _positionsComputed = false;  // 全局标志：computePositions 是否已执行过（只在首次打开页面时执行一次）
 
 // ===== 汇率换算 =====
 function toCNY(amount, currency) {
@@ -106,65 +107,87 @@ function save() {
 
 // ===== INIT =====
 function load() {
-  // 先显示加载状态，避免闪烁
+  // 重置全局标志
+  _positionsComputed = false;
+  try { window._positionsComputed = false; } catch(e) {}
+  
+  // 设置日期输入框默认值
   $('sDate').value = new Date().toISOString().slice(0, 10);
   $('tDate').value = new Date().toISOString().slice(0, 10);
-  // 尝试从服务器加载
-  fetch(API_URL + '?t=' + Date.now(), { cache: 'no-store' })
-    .then(function(r) { if (!r.ok) throw 'bad response'; return r.json(); })
-    .then(function(data) {
-      // 转换API account格式到前端格式
-      if (data.account) {
-        state.account = {
-          name: data.account.name || '我的投资账户',
-          initialAmount: data.account.initialAmount || data.account.balance || 0,
-          currentCash: data.account.currentCash !== undefined ? data.account.currentCash : (data.account.balance || 0),
-          createdAt: data.account.createdAt || new Date().toISOString().slice(0, 10)
+  
+  var data = null;
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', API_URL + '?t=' + Date.now(), false); // 同步请求
+    xhr.send(null);
+    if (xhr.status === 200) {
+      data = JSON.parse(xhr.responseText);
+    }
+  } catch(e) {
+    console.log('Server load error:', e);
+  }
+  
+  // 如果服务器无数据，尝试本地缓存
+  if (!data || !data.positions || Object.keys(data.positions).length === 0) {
+    try {
+      var cached = JSON.parse(localStorage.getItem('kid_invest_v1') || 'null');
+      if (cached && cached.positions && Object.keys(cached.positions).length > 0) {
+        data = cached;
+      }
+    } catch(e) {}
+  }
+  
+  // 如果都没有数据，显示开户页面
+  if (!data || !data.account) {
+    showSetup();
+    return;
+  }
+  
+  // 应用数据到 state
+  state.account = {
+    name: data.account.name || '我的投资账户',
+    initialAmount: data.account.initialAmount || data.account.balance || 0,
+    currentCash: data.account.currentCash !== undefined ? data.account.currentCash : (data.account.balance || 0),
+    createdAt: data.account.createdAt || new Date().toISOString().slice(0, 10)
+  };
+  state.transactions = data.transactions || [];
+  state.currentPrices = data.currentPrices || {};
+  state.positions = {};
+  
+  // 转换API数据格式到前端格式
+  if (data.positions) {
+    Object.keys(data.positions).forEach(function(a) {
+      var p = data.positions[a];
+      if (p.shares !== undefined) {
+        state.positions[a] = {
+          totalShares: p.shares,
+          totalCost: p.costBasis !== undefined ? p.costBasis : (p.shares * (p.costPrice || p.currentPrice || 0)),
+          currentPrice: p.currentPrice || p.costPrice || 0,
+          symbol: p.symbol || a,
+          name: p.name || a,
+          currency: p.currency || 'USD'
         };
-      } else {
-        state.account = null;
       }
-      state.transactions = data.transactions || [];
-      state.positions = data.positions || {};
-      state.currentPrices = data.currentPrices || {};
-      // 转换API数据格式到前端格式（如果需要）
-      if (data.positions) {
-        Object.keys(data.positions).forEach(function(a) {
-          var p = data.positions[a];
-          // API格式: shares, costPrice, costBasis -> 前端格式: totalShares, totalCost, currentPrice
-          if (p.shares !== undefined) {
-            if (!state.positions[a]) state.positions[a] = {};
-            state.positions[a].totalShares = p.shares;
-            // costBasis 是服务器保存的总成本，直接信任它
-            state.positions[a].totalCost = p.costBasis !== undefined ? p.costBasis : (p.shares * p.costPrice);
-            state.positions[a].currentPrice = p.currentPrice || p.costPrice || 0;
-            state.positions[a].symbol = p.symbol || a;
-            state.positions[a].name = p.name || a;
-            state.positions[a].currency = p.currency || 'USD';
-          }
-        });
-      }
-      // 容错：如果 currentPrices 缺失，从 positions 读取
-      if (!data.currentPrices && data.positions) {
-        Object.keys(data.positions).forEach(function(a) {
-          state.currentPrices[a] = data.positions[a].currentPrice || data.positions[a].costPrice || 0;
-        });
-      }
-      // 容错：如果 positions 缺失，从 transactions 重建
-      // 注意：有 positions 时直接使用，不再用 transactions 重复叠加（会导致持仓翻倍）
-      if ((!data.positions || Object.keys(data.positions).length === 0) && data.transactions && data.transactions.length > 0) {
-        computePositions();
-      }
-      // 同步到本地备份
-      localStorage.setItem(SK, JSON.stringify(state));
-      if (state.account) { showMain(); } else { showSetup(); }
-    })
-    .catch(function(err) {
-      // 服务器请求失败，清空旧 localStorage，直接显示开户
-      localStorage.removeItem(SK);
-      state.account = null;
-      showSetup();
     });
+  }
+  
+  // 容错：如果 currentPrices 缺失，从 positions 读取
+  if (!data.currentPrices && data.positions) {
+    Object.keys(data.positions).forEach(function(a) {
+      state.currentPrices[a] = data.positions[a].currentPrice || data.positions[a].costPrice || 0;
+    });
+  }
+  
+  // 容错：如果 positions 缺失，从 transactions 重建（仅首次）
+  if ((!data.positions || Object.keys(data.positions).length === 0) && state.transactions.length > 0) {
+    computePositions();
+  }
+  
+  // 同步到本地备份
+  localStorage.setItem('kid_invest_v1', JSON.stringify(state));
+  
+  // 数据加载完成，显示主界面
+  showMain();
 }
 function showSetup() {
   $('mainNav').style.display = 'none';
@@ -240,16 +263,13 @@ $('modal').addEventListener('click', function(e) { if (e.target.id === 'modal') 
 
 // ===== COMPUTE =====
 function computePositions() {
+  // 全局标志防止重复调用——每次 load 时重置为 false，之后只执行一次
+  if (_positionsComputed) return;
+  _positionsComputed = true;
+  
+  // 直接从交易记录计算持仓，不继承 state.positions（避免翻倍）
+  // 因为页面加载时 state.positions 已经是服务器返回的正确数据
   var pos = {};
-  // 先从现有 state.positions 继承 currentPrices（保留最新价格）
-  Object.keys(state.positions || {}).forEach(function(a) {
-    pos[a] = {
-      totalShares: state.positions[a].totalShares || 0,
-      totalCost: state.positions[a].totalCost || 0,
-      currentPrice: state.positions[a].currentPrice || state.currentPrices[a] || 0
-    };
-  });
-  // 再用交易记录验证/重建持仓份额和成本
   state.transactions.forEach(function(tx) {
     if (!pos[tx.asset]) {
       pos[tx.asset] = { totalShares: 0, totalCost: 0, currentPrice: state.currentPrices[tx.asset] || tx.price || 0 };
@@ -264,7 +284,12 @@ function computePositions() {
       if (pos[tx.asset].totalShares <= 0.0001) { delete pos[tx.asset]; }
     }
   });
-  state.positions = pos;
+  // 如果没有交易记录，保留服务器返回的 positions
+  if (Object.keys(pos).length === 0 && Object.keys(state.positions).length > 0) {
+    // 不做操作，直接用 state.positions
+  } else if (Object.keys(pos).length > 0) {
+    state.positions = pos;
+  }
   return pos;
 }
 
@@ -634,7 +659,7 @@ function renderLineChart() {
   // Add current point if no recent transaction
   var lastDate = txs.length ? txs[txs.length - 1].date : startDate;
   if (lastDate !== endDate) {
-    computePositions();
+    // 直接用当前 state.positions 计算市值
     var curCash = state.account.currentCash;
     var curPosVal = 0;
     Object.keys(state.positions).forEach(function(a) {
@@ -707,8 +732,7 @@ function renderPieChart() {
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, W, 220);
 
-  computePositions();
-  var pv = 0;
+  // 直接用当前 state.positions 计算市值，不再调用 computePositions()
   Object.keys(state.positions).forEach(function(a) {
     var price = state.currentPrices[a] || state.positions[a].currentPrice;
     var currency = state.positions[a].currency || 'USD';
@@ -763,7 +787,7 @@ function renderPieChart() {
 
 // ===== REBALANCE =====
 function renderRebalance() {
-  computePositions();
+  // 直接用当前 state，不调用 computePositions（避免任何可能的污染）
   var s = getStats();
   $('rbTotal').textContent = '¥' + fmt(s.total);
   $('rbPos').textContent = '¥' + fmt(s.posValue);
@@ -783,7 +807,7 @@ function renderRebalance() {
 function rbShowSell() {
   var asset = $('rbSellAsset').value;
   if (!asset) { $('rbSellSection').style.display = 'none'; return; }
-  computePositions();
+  // 不再调用 computePositions()，直接用当前 state（避免覆盖用户输入）
   var pos = state.positions[asset];
   $('rbAvailShares').textContent = fmt(pos.totalShares);
   $('rbSellPrice').value = fmt(pos.currentPrice);
@@ -799,8 +823,7 @@ function executeRebalance() {
   var buyAmount = parseFloat($('rbBuyAmount').value);
   var date = new Date().toISOString().slice(0, 10);
 
-  computePositions();
-
+  // 不再调用 computePositions()，直接用当前 state（避免把旧数据覆盖掉新输入）
   // Sell
   if (sellAsset) {
     if (!sellPrice || sellPrice <= 0) { toast('请输入有效卖出价格'); return; }
@@ -837,7 +860,6 @@ function executeRebalance() {
   if (!sellAsset && !buyAsset) { toast('请填写卖出或买入信息'); return; }
 
   save();
-  computePositions();
   updateHeader();
   renderRebalance();
   toast('调仓完成！');
@@ -901,7 +923,6 @@ function addFunds() {
   state.account.currentCash += amt;
   state.account.initialAmount += amt;
   save();
-  computePositions();
   updateHeader();
   renderPositions();
   closeModal();
@@ -921,7 +942,6 @@ function withdrawFunds() {
   // 初始资金也减少（收益率基准下调）
   state.account.initialAmount = Math.max(0, state.account.initialAmount - amt);
   save();
-  computePositions();
   updateHeader();
   renderPositions();
   closeModal();
