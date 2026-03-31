@@ -1,0 +1,108 @@
+<div class="hdr">
+  <div class="hdr-top">
+    <div><h1>📈 儿童投资小管家</h1><p class="sub" id="accName">记录成长 · 培养财商</p></div>
+    <button class="btn-reset" onclick="confirmReset()">🔄 重置</button>
+  </div>
+  <div class="hs">
+    <div class="hsItem"><div class="lbl">总资产</div><div class="val" id="statTotal">—</div></div>
+    <div class="hsItem"><div class="lbl">总收益</div><div class="val" id="statGain">—</div></div>
+    <div class="hsItem"><div class="lbl">收益率</div><div class="val" id="statRate">—</div></div>
+  </div>
+</div>
+
+<div class="nav" id="mainNav" style="display:none">
+  <button class="nb active" data-panel="positions">📊 持仓</button>
+  <button class="nb" data-panel="trade">💰 交易</button>
+  <button class="nb" data-panel="history">📋 记录</button>
+  <button class="nb" data-panel="chart">📈 图表</button>
+  <button class="nb" data-panel="rebalance">🔄 调仓</button>
+</div>
+
+<div class="ctn">
+
+  <!-- SETUP -->
+  <div class="panel active" id="panel-setup">
+    <div class="ss">
+      <div class="ico">🌱</div>
+      <h2>欢迎来到投资小管家</h2>
+      <p>设置投资账户，开启财商之旅！</p>
+      <div style="text-align:left">
+        <div class="fg"><label class="lbl2">账户名称</label><input type="text" id="sName" value="我的投资账户"></div>
+        <div class="fg"><label class="lbl2">初始资金（元）</label><input type="number" id="sAmount" placeholder="例如：2000" min="1"></div>
+        <div class="fg"><label class="lbl2">初始化日期</label><input type="date" id="sDate"></div>
+        <button class="btn btn-p w100" onclick="initAccount()">🚀 开通账户</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- POSITIONS -->
+  <div class="panel" id="panel-positions">
+    <div class="card"><div class="ct">💼 当前持仓</div><div id="positionsList"></div></div>
+    <div class="card"><div class="ct">📌 批量更新价格</div><div id="priceUpdateList"></div><button class="btn btn-p w100" onclick="fetchPricesFromAPI()">🌐 获取实时价格</button>
+      <button class="btn btn-p w100 mt8" onclick="batchUpdatePrices()">💾 保存价格</button></div>
+    <div class="card"><div class="ct">💡 账户概览</div><div id="accountOverview"></div><div class="btn-row"><button class="btn btn-p w50" onclick="openAddFundsModal()">💰 追加</button><button class="btn btn-d w50" onclick="openWithdrawModal()">🏧 提取</button></div>
+      <div class="btn-row"><button class="btn btn-o w50" onclick="exportData()">📤 导出备份</button><button class="btn btn-o w50" onclick="document.getElementById('importFile').click()">📥 导入恢复</button></div><input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)"></div>
+  </div>
+
+  <!-- TRADE -->
+  <div class="panel" id="panel-trade">
+    <div class="card">
+      <div class="ct">📝 记录交易</div>
+      <div class="tt"><button id="btnBuy" class="ab" onclick="setTradeType('buy')">📈 买入</button><button id="btnSell" onclick="setTradeType('sell')">📉 卖出</button></div>
+      <div class="fg"><label class="lbl2">交易日期</label><input type="date" id="tDate"></div>
+      <div class="fg"><label class="lbl2">投资标的</label><input type="text" id="tAsset" placeholder="例如：纳斯达克ETF"></div>
+      <div class="fg"><label class="lbl2">交易价格（元）</label><input type="number" id="tPrice" placeholder="例如：1.25" step="0.001"></div>
+      <div class="fg"><label class="lbl2">交易金额（元）</label><input type="number" id="tAmount" placeholder="例如：500"></div>
+      <div class="fg"><label class="lbl2">备注（可选）</label><input type="text" id="tNote" placeholder=""></div>
+      <button class="btn btn-p w100" onclick="submitTrade()">✅ 确认交易</button>
+    </div>
+    <div id="sellInfo" style="display:none" class="card"><div class="ct">📉 当前可卖出持仓</div><div id="sellPositionInfo"></div></div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="panel" id="panel-history">
+    <div class="filter-bar" id="filterBar"></div>
+    <div id="historyList"></div>
+  </div>
+
+  <!-- CHART -->
+  <div class="panel" id="panel-chart">
+    <div class="cw"><div class="ct">📈 收益曲线</div><canvas id="chartCanvas" height="200"></canvas></div>
+    <div class="cw"><div class="ct">🥧 持仓分布</div><canvas id="pieCanvas" height="220"></canvas></div>
+  </div>
+
+  <!-- REBALANCE -->
+  <div class="panel" id="panel-rebalance">
+    <div class="rs"><div class="rt" id="rbTotal">—</div><div class="rb">
+      <div class="ri"><label>持仓市值</label><span id="rbPos">—</span></div>
+      <div class="ri"><label>现金余额</label><span id="rbCash">—</span></div>
+    </div></div>
+    <div class="card"><div class="ct">🔄 执行调仓</div>
+      <div class="fg"><label class="lbl2">卖出标的（可选）</label><select id="rbSellAsset" onchange="rbShowSell()"><option value="">— 选择标的 —</option></select></div>
+      <div id="rbSellSection" style="display:none">
+        <div class="fg"><label class="lbl2">卖出份额</label><input type="number" id="rbSellShares" placeholder="留空则全部卖出"> <span style="font-size:.78rem;color:var(--tl)">可用：<span id="rbAvailShares">0</span>份</span></div>
+        <div class="fg"><label class="lbl2">卖出价格</label><input type="number" id="rbSellPrice" step="0.001"></div>
+      </div>
+      <div class="fg"><label class="lbl2">买入标的（可选）</label><input type="text" id="rbBuyAsset" placeholder="新标的名称"></div>
+      <div class="fg"><label class="lbl2">买入价格</label><input type="number" id="rbBuyPrice" step="0.001"></div>
+      <div class="fg"><label class="lbl2">买入金额</label><input type="number" id="rbBuyAmount" placeholder="例如：500"></div>
+      <button class="btn btn-p w100" onclick="executeRebalance()">⚡ 执行调仓</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="mo" id="modal"><div class="modal"><div class="mh"></div><h3 id="modalTitle"></h3><div id="modalBody"></div></div></div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Tab bar -->
+<div class="tab-bar" id="tabBar" style="display:none">
+  <button class="tab-item active" data-panel="positions"><span class="icon">📊</span>持仓</button>
+  <button class="tab-item" data-panel="trade"><span class="icon">💰</span>交易</button>
+  <button class="tab-item" data-panel="history"><span class="icon">📋</span>记录</button>
+  <button class="tab-item" data-panel="chart"><span class="icon">📈</span>图表</button>
+  <button class="tab-item" data-panel="rebalance"><span class="icon">🔄</span>调仓</button>
+</div>

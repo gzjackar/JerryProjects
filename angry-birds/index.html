@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="screen-orientation" content="landscape">
+  <meta name="orientation" content="landscape">
+  <title>🐦 愤怒的小鸟</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#1a1a2e;overflow:hidden;touch-action:none;font-family:-apple-system,BlinkMacSystemFont,sans-serif}
+    #gameCanvas{display:block;position:absolute;top:0;left:0}
+    #ui{position:absolute;top:15px;left:15px;right:15px;display:flex;justify-content:space-between;align-items:center;color:white;font-size:16px;font-weight:bold;text-shadow:2px 2px 4px rgba(0,0,0,0.7);pointer-events:none;z-index:10}
+    .ui-box{background:rgba(0,0,0,0.5);padding:8px 15px;border-radius:20px;backdrop-filter:blur(5px)}
+    #overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;z-index:100}
+    #overlay h1{font-size:48px;margin-bottom:10px}
+    #overlay .subtitle{font-size:18px;color:#ccc;margin-bottom:25px}
+    #overlay p{font-size:20px;margin-bottom:20px}
+    .btn{background:linear-gradient(180deg,#FFD700 0%,#FFA500 100%);color:#333;border:none;padding:15px 50px;font-size:20px;font-weight:bold;border-radius:30px;cursor:pointer;margin:8px;box-shadow:0 4px 15px rgba(255,165,0,0.4);transition:transform 0.1s}
+    .btn:hover{transform:scale(1.05)}
+    .btn:active{transform:scale(0.95)}
+    .btn-blue{background:linear-gradient(180deg,#4A90D9 0%,#2E5A8B 100%);color:white}
+    .hidden{display:none!important}
+    #birdsLeft{position:absolute;top:60px;right:20px;display:flex;gap:8px;z-index:10}
+    .bird-icon{width:35px;height:35px;background:radial-gradient(circle at 30% 30%,#FF6B6B,#CC0000);border-radius:50%;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3)}
+    .bird-icon.used{background:#555;border-color:#888}
+    #instructions{position:absolute;bottom:55px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.8);font-size:14px;text-shadow:1px 1px 2px black;pointer-events:none;z-index:10}
+    #rotateTip{position:fixed;inset:0;background:rgba(8,10,24,0.96);display:none;align-items:center;justify-content:center;flex-direction:column;color:#fff;z-index:300;text-align:center;padding:24px}
+    #rotateTip .phone{font-size:64px;margin-bottom:14px;animation:wobble 1.4s ease-in-out infinite}
+    #rotateTip .tip-title{font-size:28px;font-weight:bold;margin-bottom:10px}
+    #rotateTip .tip-sub{font-size:16px;color:#cfd8dc;line-height:1.5}
+    @keyframes wobble{0%,100%{transform:rotate(0deg)}50%{transform:rotate(90deg)}}
+    @media screen and (orientation:portrait){
+      #rotateTip{display:flex}
+    }
+    #levelSelect{display:flex;gap:15px;margin-top:20px}
+    .level-btn{width:60px;height:60px;border-radius:15px;border:3px solid #FFD700;background:linear-gradient(180deg,#333 0%,#222 100%);color:#FFD700;font-size:24px;font-weight:bold;cursor:pointer}
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <div id="ui"><span id="levelName" class="ui-box">第 1 关</span><span id="score" class="ui-box">🐷 0</span></div>
+  <div id="birdsLeft"></div>
+  <div id="instructions">🎯 拖动小鸟发射！飞行中点击加速！</div>
+  <div id="rotateTip">
+    <div class="phone">📱</div>
+    <div class="tip-title">请横屏游玩</div>
+    <div class="tip-sub">把手机转到横屏，空间会更大，操作也更顺手。</div>
+  </div>
+  <div id="overlay">
+    <h1>🐦 愤怒的小鸟</h1>
+    <div class="subtitle">Angry Birds Clone</div>
+    <p>消灭所有猪猪过关！</p>
+    <button class="btn" id="startBtn">开始游戏</button>
+    <div id="levelSelect">
+      <button class="level-btn" onclick="lockLandscape();startLevel(1)">1</button>
+      <button class="level-btn" onclick="lockLandscape();startLevel(2)">2</button>
+      <button class="level-btn" onclick="lockLandscape();startLevel(3)">3</button>
+    </div>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
