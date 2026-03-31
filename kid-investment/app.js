@@ -1,6 +1,7 @@
 // ===== STATE =====
 var state = { account: null, transactions: [], positions: {}, currentPrices: {} };
 var USD_TO_CNY = 7.2;  // 固定汇率：1美元=7.2人民币
+var _positionsComputed = false;  // 全局标志：computePositions 是否已执行过（只在首次打开页面时执行一次）
 
 // ===== 汇率换算 =====
 function toCNY(amount, currency) {
@@ -240,6 +241,9 @@ $('modal').addEventListener('click', function(e) { if (e.target.id === 'modal') 
 
 // ===== COMPUTE =====
 function computePositions() {
+  // 全局标志防止重复调用——每次 load 时重置为 false，之后只执行一次
+  if (_positionsComputed) return;
+  _positionsComputed = true;
   var pos = {};
   // 先从现有 state.positions 继承 currentPrices（保留最新价格）
   Object.keys(state.positions || {}).forEach(function(a) {
