@@ -767,7 +767,7 @@ function renderPieChart() {
 
 // ===== REBALANCE =====
 function renderRebalance() {
-  computePositions();
+  // 直接用当前 state，不调用 computePositions（避免任何可能的污染）
   var s = getStats();
   $('rbTotal').textContent = '¥' + fmt(s.total);
   $('rbPos').textContent = '¥' + fmt(s.posValue);
@@ -787,7 +787,7 @@ function renderRebalance() {
 function rbShowSell() {
   var asset = $('rbSellAsset').value;
   if (!asset) { $('rbSellSection').style.display = 'none'; return; }
-  computePositions();
+  // 不再调用 computePositions()，直接用当前 state（避免覆盖用户输入）
   var pos = state.positions[asset];
   $('rbAvailShares').textContent = fmt(pos.totalShares);
   $('rbSellPrice').value = fmt(pos.currentPrice);
@@ -803,8 +803,7 @@ function executeRebalance() {
   var buyAmount = parseFloat($('rbBuyAmount').value);
   var date = new Date().toISOString().slice(0, 10);
 
-  computePositions();
-
+  // 不再调用 computePositions()，直接用当前 state（避免把旧数据覆盖掉新输入）
   // Sell
   if (sellAsset) {
     if (!sellPrice || sellPrice <= 0) { toast('请输入有效卖出价格'); return; }
@@ -841,7 +840,6 @@ function executeRebalance() {
   if (!sellAsset && !buyAsset) { toast('请填写卖出或买入信息'); return; }
 
   save();
-  computePositions();
   updateHeader();
   renderRebalance();
   toast('调仓完成！');
