@@ -1356,8 +1356,8 @@ function gameLoop(){
   miniBirds.forEach(function(mb){
     if(mb.dead||!mb.body) return;
     mb.flightTime++;
-    // Remove miniBird after 6 seconds or if goes off right side
-    if(mb.flightTime>360||mb.body.position.x>W+50){
+    // Remove miniBird after 8 seconds or if goes off right side (more generous)
+    if(mb.flightTime>480||mb.body.position.x>W+50){
       mb.dead=true;
       Composite.remove(engine.world,mb.body);
     }
@@ -1366,11 +1366,20 @@ function gameLoop(){
   if(!bird||!launched) return;
   birdFlightTime++;
   var speed=Math.hypot(bird.velocity.x,bird.velocity.y);
-  // Remove bird only if: off right side, or hit ground, or very long flight (8 seconds)
-  var hitGround=(bird.position.y>GROUND_Y-10);
-  var offRight=(bird.position.x>W+100);
-  var tooLong=birdFlightTime>480; // 8 seconds max flight time
-  if(hitGround||offRight||tooLong){
+  
+  // Check if bird is actually flying (has significant velocity)
+  var isFlying = speed > 1;
+  
+  // Remove bird only if: off right side, or stopped AND on ground, or very long flight
+  // More lenient ground detection - only remove if bird is very low AND moving slowly
+  var veryLow = (bird.position.y > GROUND_Y - 5); // More strict - only very close to ground
+  var stopped = (speed < 0.5); // Bird stopped moving
+  var offRight = (bird.position.x > W + 100);
+  var tooLong = (birdFlightTime > 600); // 10 seconds max flight time (more generous)
+  
+  // Only remove if bird is off right side OR (stopped AND very low) OR too long
+  // This prevents birds from disappearing mid-flight
+  if(offRight || (stopped && veryLow) || tooLong){
     Composite.remove(engine.world,bird);
     bird=null;
     birdStillFrames=0;
