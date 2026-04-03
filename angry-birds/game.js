@@ -1374,7 +1374,9 @@ function gameLoop(){
   var stopped = (speed < 0.3);
   var tooLong = (birdFlightTime > 720); // 12 seconds max (very generous)
   
-  if(offRight || (veryLow && stopped) || tooLong){
+  // ONLY remove when bird goes OFF RIGHT side of screen (most conservative)
+  // This prevents any mid-flight disappearances
+  if(bird.position.x > W + 100){
     Composite.remove(engine.world,bird);
     bird=null;
     birdStillFrames=0;
@@ -1383,7 +1385,6 @@ function gameLoop(){
     if(pigs.length>0&&birdsLeft>0){
       setTimeout(spawnBird,500);
     } else if(pigs.length>0){
-      // No birds left - check win/fail immediately
       scheduleCheckState();
     }
   }
