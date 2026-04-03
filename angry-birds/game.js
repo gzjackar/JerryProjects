@@ -1367,19 +1367,14 @@ function gameLoop(){
   birdFlightTime++;
   var speed=Math.hypot(bird.velocity.x,bird.velocity.y);
   
-  // Check if bird is actually flying (has significant velocity)
-  var isFlying = speed > 1;
-  
-  // Remove bird only if: off right side, or stopped AND on ground, or very long flight
-  // More lenient ground detection - only remove if bird is very low AND moving slowly
-  var veryLow = (bird.position.y > GROUND_Y - 5); // More strict - only very close to ground
-  var stopped = (speed < 0.5); // Bird stopped moving
+  // Remove bird only if: off right side, OR hit very low AND very slow, OR very long flight
+  // This is very permissive - only removes when clearly done
   var offRight = (bird.position.x > W + 100);
-  var tooLong = (birdFlightTime > 600); // 10 seconds max flight time (more generous)
+  var veryLow = (bird.position.y > H - 20); // Only remove if past bottom of screen
+  var stopped = (speed < 0.3);
+  var tooLong = (birdFlightTime > 720); // 12 seconds max (very generous)
   
-  // Only remove if bird is off right side OR (stopped AND very low) OR too long
-  // This prevents birds from disappearing mid-flight
-  if(offRight || (stopped && veryLow) || tooLong){
+  if(offRight || (veryLow && stopped) || tooLong){
     Composite.remove(engine.world,bird);
     bird=null;
     birdStillFrames=0;
